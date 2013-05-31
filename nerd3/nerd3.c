@@ -93,18 +93,10 @@ ISR(TIMER1_COMPA_vect)
     __di();
 
     HHKScanCode = (HHKScanCode + 1) & 0x3F;
-    PORTB = HHKScanCode |0x40;                // #OE(PB6) --> HI
-    PORTB &= 0x3F;                            // LO
+    PORTB = HHKScanCode | 0x40;         // #OE(PB6) --> HI
+    PORTB &= 0x3F;                      // #OE(PB6) --> LO
     sw = PINB & 0x80;                   // #PRESS==LOなら当該キーが押されている, HIならリリースされている
     PORTB |= 0x40;                      // #OE(PC6) --> HI
-
-#if 0
-    if(HHKScanCode == 0x1F) {
-        // 0x1F: space
-        if(sw == 0)
-            uart_send('_');
-    }
-#endif
 
     if(sw != ScanBuf[HHKScanCode]) {
         ScanBuf[HHKScanCode] = sw;      // update
