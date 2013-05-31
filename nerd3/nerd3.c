@@ -27,7 +27,7 @@ static inline void init_devices(void)
     TCCR1B = (0x01<<CS10) | (1<<WGM12); // CLKio/1, CTC(Clear Timer on Compare Match)
                                         // CLKio: 1 MHz = internal RC osc (factory default)
     TIMSK1 = 1<<OCIE1A;                 // Compare A match interrupt
-    OCR1A  = 200;                       // row a => 200us cycled (T=400us)
+    OCR1A  = 200;                       // bit0 is inverted 200us cycled (T=400us)
     
     /* PORTB */
     DDRB  = 0x7F;                       // b7:    IN   #PRESS
