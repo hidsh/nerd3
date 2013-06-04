@@ -66,6 +66,7 @@ static inline void uart_send(u1 ch)
   UDR0 = ch;
 }
 
+#if 0
 static inline void send_hid_release_all(void)
 {
                 /* 0     1     2     3     4     5     6     7     8     9     10   */
@@ -75,6 +76,7 @@ static inline void send_hid_release_all(void)
     for(u1 i=0; i<11; i++)
         uart_send(rep[i]);
 }
+#endif
 
 static inline void send_hid_report(void)
 {
@@ -84,6 +86,8 @@ static inline void send_hid_report(void)
     u1 *pmod  = &rep[3];
     u1 *pscan = &rep[5];
         
+    if(TXBuf.unread_count == 0) return; // do nothing
+
     while(TXBuf.unread_count > 0) {
         u1 c, m;
         ringbuf_read(&TXBuf, &c);
@@ -97,9 +101,12 @@ static inline void send_hid_report(void)
             *pmod |= m;
         }
     }
-    
+
     for(u1 i=0; i<11; i++)
-        uart_send(rep[i]);
+        uart_send(rep[i]);              // send report 'pressed' something
+
+    if(TXBuf.unread_count == 0)         // prepare sending report 'release all' next call
+        ringbuf_write(&TXBuf, 0x3F);    // 0x3F --> USID_NONE
 }
 
 static inline void test_send(u1 hhk_code)
@@ -135,7 +142,7 @@ int main(void)
     __ei();
 
 #if 0
-    test_sexxnd(0x05); // z
+    test_send(0x05); // z
     test_send(0x23); // i
     test_send(0x0D); // f
     test_send(0x06); // x
@@ -148,8 +155,8 @@ int main(void)
     ringbuf_write(&TXBuf, 0x06); // x --> 0x1B
     ringbuf_write(&TXBuf, 0x23); // i --> 0x0C
     ringbuf_write(&TXBuf, 0x0E); // v --> 0x19
-    send_hid_report();
-    send_hid_release_all();
+    send_hid_report();  // ivx
+    send_hid_report();  // released all
 
 
     while(1)
