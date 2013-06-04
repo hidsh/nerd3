@@ -8,13 +8,17 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "mystd.h"
-#include "hhk2ascii.h"
+#include "keycode.h"
 
 /* -------------------------------------------------
  * definitions, globals and consts
  */
 u1 HHKScanCode;
 u1 ScanBuf[64];                         // 64 keys (0:pressed)
+
+#define RINGBUF_SIZE 32
+#include "ringbuf.h"
+RINGBUF TXBuf;
 
 /* -------------------------------------------------
  * initializers
@@ -62,6 +66,64 @@ static inline void uart_send(u1 ch)
   UDR0 = ch;
 }
 
+static inline void send_hid_release_all(void)
+{
+                /* 0     1     2     3     4     5     6     7     8     9     10   */
+                /* -     -     -    mod    -    scan1 scan2 scan3 scan4 scan5 scan6 */
+    u1 rep[11] = {0xFD, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    for(u1 i=0; i<11; i++)
+        uart_send(rep[i]);
+}
+
+static inline void send_hid_report(void)
+{
+                /* 0     1     2     3     4     5     6     7     8     9     10   */
+                /* -     -     -    mod    -    scan1 scan2 scan3 scan4 scan5 scan6 */
+    u1 rep[11] = {0xFD, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    u1 *pmod  = &rep[3];
+    u1 *pscan = &rep[5];
+        
+    while(TXBuf.unread_count > 0) {
+        u1 c, m;
+        ringbuf_read(&TXBuf, &c);
+        m = modifier_bit(c);
+        if(m == 0x00) {
+            // common keys
+            *pscan++ = HHK2HID_TBL[c];
+            if(pscan > &rep[10]) break;
+        } else {
+            // modifier keys
+            *pmod |= m;
+        }
+    }
+    
+    for(u1 i=0; i<11; i++)
+        uart_send(rep[i]);
+}
+
+static inline void test_send(u1 hhk_code)
+{
+                /* 0     1     2     3     4     5     6     7     8     9     10   */
+                /* -     -     -    mod    -    scan1 scan2 scan3 scan4 scan5 scan6 */
+    u1 rep[11] = {0xFD, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    //u1 hhk_code = 0x05; // z
+
+    rep[5] = HHK2HID_TBL[hhk_code];
+    
+    for(u1 i=0; i<11; i++)
+        uart_send(rep[i]);
+}
+
+static inline void test_send2(void)
+{
+                /* 0     1     2     3     4     5     6     7     8     9     10   */
+                /* -     -     -    mod    -    scan1 scan2 scan3 scan4 scan5 scan6 */
+    u1 rep[11] = {0xFD, 0x09, 0x01, 0x00, 0x00, 0x04, 0x07, 0x09, 0x00, 0x00, 0x00};
+
+    for(u1 i=0; i<11; i++)
+        uart_send(rep[i]);
+}
 
 /* -------------------------------------------------
  * main
@@ -72,11 +134,28 @@ int main(void)
     init_rams();
     __ei();
 
-    uart_send('A');
+#if 0
+    test_sexxnd(0x05); // z
+    test_send(0x23); // i
+    test_send(0x0D); // f
+    test_send(0x06); // x
+    test_send(0x3F); // none
+
+    test_send2();    // adf
+    test_send(0x3F); // none --> zifxadf
+#endif
+
+    ringbuf_write(&TXBuf, 0x06); // x --> 0x1B
+    ringbuf_write(&TXBuf, 0x23); // i --> 0x0C
+    ringbuf_write(&TXBuf, 0x0E); // v --> 0x19
+    send_hid_report();
+    send_hid_release_all();
+
 
     while(1)
     {
-        //TODO:: Please write your application code 
+        //TODO:: Please write your application code
+//        send_hid_report(); 
     }
 
     return EXIT_SUCCESS;
@@ -100,9 +179,9 @@ ISR(TIMER1_COMPA_vect)
 
     if(sw != ScanBuf[HHKScanCode]) {
         ScanBuf[HHKScanCode] = sw;      // update
-        if(sw == 0)
-            uart_send(hhk2ascii_tbl[HHKScanCode]);
-            //ringbuf_write(&TXBuf, HHKScanCode);     // press --> send
+        if(sw == 0) 
+            //uart_send(hhk2ascii_tbl[HHKScanCode]);
+            ringbuf_write(&TXBuf, HHKScanCode);     // press --> send
     }
 
     __ei();

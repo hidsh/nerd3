@@ -127,6 +127,9 @@
     <Compile Include="hhk2ascii.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="keycode.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="mystd.h">
       <SubType>compile</SubType>
     </Compile>
